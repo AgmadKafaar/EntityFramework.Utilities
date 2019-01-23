@@ -1,11 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using EntityFramework.Utilities;
+using EntityFramework.Utilities.BatchOperations;
+using EntityFramework.Utilities.Extensions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Tests.FakeDomain;
-using Tests.FakeDomain.Models;
 using Tests.Models;
-using System;
 
 namespace Tests
 {
@@ -24,12 +24,12 @@ namespace Tests
 	            {
                     post.Title = post.Title.Replace("1", "4").Replace("2", "8").Replace("3", "12");
 	            }
-                EFBatchOperation.For(db, db.BlogPosts).UpdateAll(posts, spec => spec.ColumnsToUpdate(p => p.Title));
+                EfBatchOperation.For(db, db.BlogPosts).UpdateAll(posts, spec => spec.ColumnsToUpdate(p => p.Title));
             }
 
             using (var db = Context.Sql())
             {
-                var posts = db.BlogPosts.OrderBy(b => b.ID).ToList();
+                var posts = db.BlogPosts.OrderBy(b => b.Id).ToList();
                 Assert.AreEqual("T4", posts[0].Title);
                 Assert.AreEqual("T8", posts[1].Title);
                 Assert.AreEqual("T12", posts[2].Title);
@@ -47,12 +47,14 @@ namespace Tests
                 }
                 db.Database.Create();
 
-                List<Contact> people = new List<Contact>();
-                people.Add(Contact.Build("FN1", "LN1", "Director"));
-                people.Add(Contact.Build("FN2", "LN2", "Associate"));
-                people.Add(Contact.Build("FN3", "LN3", "Vice President"));
+                List<Contact> people = new List<Contact>
+                {
+                    Contact.Build("FN1", "LN1", "Director"),
+                    Contact.Build("FN2", "LN2", "Associate"),
+                    Contact.Build("FN3", "LN3", "Vice President")
+                };
 
-                EFBatchOperation.For(db, db.People).InsertAll(people);
+                EfBatchOperation.For(db, db.People).InsertAll(people);
             }
 
             using (var db = Context.Sql())
@@ -64,7 +66,7 @@ namespace Tests
                     contact.FirstName = contact.Title + " " + contact.FirstName;
                 }
 
-                EFBatchOperation.For(db, db.People).UpdateAll(contacts, x => x.ColumnsToUpdate(p => p.FirstName));
+                EfBatchOperation.For(db, db.People).UpdateAll(contacts, x => x.ColumnsToUpdate(p => p.FirstName));
             }
 
             using (var db = Context.Sql())
@@ -86,11 +88,12 @@ namespace Tests
                 }
                 db.Database.Create();
 
-                var list = new List<NumericTestObject>(){
-                    new NumericTestObject{ }
+                var list = new List<NumericTestObject>
+                {
+                    new NumericTestObject()
                 };
 
-                EFBatchOperation.For(db, db.NumericTestsObjects).InsertAll(list);
+                EfBatchOperation.For(db, db.NumericTestsObjects).InsertAll(list);
             }
 
             using (var db = Context.Sql())
@@ -102,7 +105,7 @@ namespace Tests
                     item.FloatType = 2.1f;
                     item.NumericType = 3.1m;
                 }
-                EFBatchOperation.For(db, db.NumericTestsObjects).UpdateAll(items, spec => spec.ColumnsToUpdate(p => p.DecimalType, p => p.FloatType, p => p.NumericType));
+                EfBatchOperation.For(db, db.NumericTestsObjects).UpdateAll(items, spec => spec.ColumnsToUpdate(p => p.DecimalType, p => p.FloatType, p => p.NumericType));
             }
 
             using (var db = Context.Sql())
@@ -126,28 +129,29 @@ namespace Tests
                 db.Database.Create();
 
                 var guid = Guid.NewGuid();
-                var list = new List<MultiPKObject>(){
-                    new MultiPKObject{ PK1 = guid, PK2 = 0 },
-                    new MultiPKObject{ PK1 = guid, PK2 = 1 }
+                var list = new List<MultiPkObject>
+                {
+                    new MultiPkObject{ Pk1 = guid, Pk2 = 0 },
+                    new MultiPkObject{ Pk1 = guid, Pk2 = 1 }
                 };
 
-                EFBatchOperation.For(db, db.MultiPKObjects).InsertAll(list);
+                EfBatchOperation.For(db, db.MultiPkObjects).InsertAll(list);
             }
 
             using (var db = Context.Sql())
             {
-                var items = db.MultiPKObjects.ToList();
+                var items = db.MultiPkObjects.ToList();
                 var index = 1;
                 foreach (var item in items)
                 {
                     item.Text = "#" + index++;
                 }
-                EFBatchOperation.For(db, db.MultiPKObjects).UpdateAll(items, spec => spec.ColumnsToUpdate(p => p.Text));
+                EfBatchOperation.For(db, db.MultiPkObjects).UpdateAll(items, spec => spec.ColumnsToUpdate(p => p.Text));
             }
 
             using (var db = Context.Sql())
             {
-                var items = db.MultiPKObjects.OrderBy(x => x.PK2).ToList();
+                var items = db.MultiPkObjects.OrderBy(x => x.Pk2).ToList();
                 Assert.AreEqual("#1", items[0].Text);
                 Assert.AreEqual("#2", items[1].Text);
             }
@@ -165,12 +169,12 @@ namespace Tests
                 {
                     post.ShortTitle = post.Title.Replace("1", "4").Replace("2", "8").Replace("3", "12");
                 }
-                EFBatchOperation.For(db, db.BlogPosts).UpdateAll(posts, spec => spec.ColumnsToUpdate(p => p.ShortTitle));
+                EfBatchOperation.For(db, db.BlogPosts).UpdateAll(posts, spec => spec.ColumnsToUpdate(p => p.ShortTitle));
             }
 
             using (var db = Context.Sql())
             {
-                var posts = db.BlogPosts.OrderBy(b => b.ID).ToList();
+                var posts = db.BlogPosts.OrderBy(b => b.Id).ToList();
                 Assert.AreEqual("T4", posts[0].ShortTitle);
                 Assert.AreEqual("T8", posts[1].ShortTitle);
                 Assert.AreEqual("T12", posts[2].ShortTitle);
@@ -187,13 +191,14 @@ namespace Tests
                 }
                 db.Database.Create();
 
-                var list = new List<BlogPost>(){
+                var list = new List<BlogPost>
+                {
                     BlogPost.Create("T1"),
                     BlogPost.Create("T2"),
                     BlogPost.Create("T3")
                 };
 
-                EFBatchOperation.For(db, db.BlogPosts).InsertAll(list);
+                EfBatchOperation.For(db, db.BlogPosts).InsertAll(list);
             }
         }
     }

@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
-namespace EntityFramework.Utilities
+namespace EntityFramework.Utilities.Helpers
 {
     static class SqlStringHelper
     {
@@ -14,20 +13,21 @@ namespace EntityFramework.Utilities
             var toRemove = new HashSet<int>();
             foreach (var c in chars.Select((c, i) => new { c, i }))
             {
-                if (c.c == '(')
+                switch (c.c)
                 {
-                    stack.Push(new Tuple<int, int>(c.i, -1));
-                }
-                else if (c.c == ')')
-                {
-                    if (stack.Any())
-                    {
-                        stack.Pop();
-                    }
-                    else
-                    {
-                        toRemove.Add(c.i);
-                    }
+                    case '(':
+                        stack.Push(new Tuple<int, int>(c.i, -1));
+                        break;
+                    case ')':
+                        if (stack.Any())
+                        {
+                            stack.Pop();
+                        }
+                        else
+                        {
+                            toRemove.Add(c.i);
+                        }
+                        break;
                 }
             }
             foreach (var item in stack)

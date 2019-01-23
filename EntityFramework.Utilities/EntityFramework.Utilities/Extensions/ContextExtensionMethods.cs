@@ -1,28 +1,25 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Data.Entity;
-using System.Linq;
+using System.Data.Entity.Infrastructure;
 using System.Linq.Expressions;
-using System.Text;
+using EntityFramework.Utilities.Expressions;
 
-namespace EntityFramework.Utilities
+namespace EntityFramework.Utilities.Extensions
 {
     public static class ContextExtensionMethods
     {
         public class AttachAndModifyContext<T> where T : class{
-            private DbSet<T> set;
-            private System.Data.Entity.Infrastructure.DbEntityEntry<T> entry;
+            private readonly DbEntityEntry<T> _entry;
 
-            public AttachAndModifyContext(DbSet<T> set, System.Data.Entity.Infrastructure.DbEntityEntry<T> entry)
+            public AttachAndModifyContext(DbEntityEntry<T> entry)
             {
-                this.set = set;
-                this.entry = entry;
+                _entry = entry;
             }
             public AttachAndModifyContext<T> Set<TProp>(Expression<Func<T, TProp>> property, TProp value){
 
                 var setter = ExpressionHelper.PropertyExpressionToSetter(property);
-                setter(entry.Entity, value);
-                entry.Property(property).IsModified = true;
+                setter(_entry.Entity, value);
+                _entry.Property(property).IsModified = true;
                 return this;
             }
         }
@@ -32,7 +29,7 @@ namespace EntityFramework.Utilities
             set.Attach(item);
             var entry = source.Entry(item);
 
-            return new AttachAndModifyContext<T>(set, entry);
+            return new AttachAndModifyContext<T>(entry);
         }
     }
 }

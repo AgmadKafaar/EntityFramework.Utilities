@@ -1,16 +1,16 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 
-namespace EntityFramework.Utilities
+namespace EntityFramework.Utilities.Mapping
 {
-    public interface IIncludeContainer<T>
+    public interface IIncludeContainer
     {
-        IEnumerable<IncludeExecuter<T>> Includes { get; }
+        IEnumerable<IncludeExecuter> Includes { get; }
     }
 
-    public class IncludeExecuter<T>
+    public class IncludeExecuter
     {
         internal Type ElementType { get; set; }
         internal Action<IEnumerable<MethodCallExpression>, IEnumerable> Loader { get; set; }

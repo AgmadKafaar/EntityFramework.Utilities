@@ -1,34 +1,40 @@
-﻿using System;
+﻿using EntityFramework.Utilities.Mapping;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Reflection;
 
-namespace EntityFramework.Utilities
+namespace EntityFramework.Utilities.EfQuery
 {
-    public class EFDataReader<T> : DbDataReader
+    public class EfDataReader<T> : DbDataReader
     {
         public IEnumerable<T> Items { get; set; }
         public IEnumerator<T> Enumerator { get; set; }
         public IList<string> Properties { get; set; }
         public List<Func<T, object>> Accessors { get; set; }
 
-        public EFDataReader(IEnumerable<T> items, IEnumerable<ColumnMapping> properties)
+        public EfDataReader(IEnumerable<T> items, IEnumerable<ColumnMapping> properties)
         {
-            Properties = properties.Select(p => p.NameOnObject).ToList();
-            Accessors = properties.Select(p =>
+            var columnMappings = properties as ColumnMapping[] ?? properties.ToArray();
+            Properties = columnMappings.Select(p => p.NameOnObject).ToList();
+            Accessors = columnMappings.Select(p =>
             {
                 if (p.StaticValue != null)
                 {
-                    Func<T,object> func = x => p.StaticValue;
+                    Func<T, object> func = x => p.StaticValue;
                     return func;
                 }
 
                 var parts = p.NameOnObject.Split('.');
 
                 PropertyInfo info = typeof(T).GetProperty(parts[0]);
-                var method = typeof(EFDataReader<T>).GetMethod("MakeDelegate");
+                var method = typeof(EfDataReader<T>).GetMethod("MakeDelegate");
+                if (method == null) return null;
+                if (info == null) return null;
+
                 var generic = method.MakeGenericMethod(info.PropertyType);
 
                 var getter = (Func<T, object>)generic.Invoke(this, new object[] { info.GetGetMethod(true) });
@@ -36,72 +42,51 @@ namespace EntityFramework.Utilities
                 var temp = info;
                 foreach (var part in parts.Skip(1))
                 {
+                    if (temp == null) continue;
                     var i = temp.PropertyType.GetProperty(part);
-                    var g =  i.GetGetMethod();
+                    if (i != null)
+                    {
+                        var g = i.GetGetMethod();
 
-                    var old = getter;
-                    getter = x => g.Invoke(old(x), null);
+                        var old = getter;
+                        getter = x => g.Invoke(old(x), null);
+                    }
 
                     temp = i;
                 }
 
-                
                 return getter;
             }).ToList();
-            Items = items;
-            Enumerator = items.GetEnumerator();
+            var itemsToProcess = items as IList<T> ?? items.ToList();
+            Items = itemsToProcess;
+            Enumerator = itemsToProcess.GetEnumerator();
         }
 
-        public static Func<T, object> MakeDelegate<U>(MethodInfo @get)
+        public static Func<T, object> MakeDelegate<TU>(MethodInfo get)
         {
-            var f = (Func<T, U>)Delegate.CreateDelegate(typeof(Func<T, U>), @get);
+            var f = (Func<T, TU>)Delegate.CreateDelegate(typeof(Func<T, TU>), get);
             return t => f(t);
         }
 
         public override void Close()
         {
-            this.Enumerator = null;
-            this.Items = null;
+            Enumerator = null;
+            Items = null;
         }
 
-        public override int FieldCount
-        {
-            get
-            {
-                return Properties.Count;
-            }
-        }
+        public override int FieldCount => Properties.Count;
 
-        public override bool HasRows
-        {
-            get { return this.Items != null && this.Items.Any(); }
-        }
+        public override bool HasRows => Items != null && Items.Any();
 
-        public override bool IsClosed
-        {
-            get { return Enumerator == null; }
-        }
+        public override bool IsClosed => Enumerator == null;
 
-        public override bool Read()
-        {
-            return this.Enumerator.MoveNext();
-        }
+        public override bool Read() => Enumerator.MoveNext();
 
-        public override int RecordsAffected
-        {
-            get { return this.Items.Count(); }
-        }
+        public override int RecordsAffected => Items.Count();
 
+        public override object GetValue(int ordinal) => Accessors[ordinal](Enumerator.Current);
 
-        public override object GetValue(int ordinal)
-        {
-            return this.Accessors[ordinal](this.Enumerator.Current);
-        }
-
-        public override int GetOrdinal(string name)
-        {
-            return Properties.IndexOf(name);
-        }
+        public override int GetOrdinal(string name) => Properties.IndexOf(name);
 
         #region Not implemented
 
@@ -175,7 +160,7 @@ namespace EntityFramework.Utilities
             throw new NotImplementedException();
         }
 
-        public override System.Collections.IEnumerator GetEnumerator()
+        public override IEnumerator GetEnumerator()
         {
             throw new NotImplementedException();
         }
@@ -230,7 +215,6 @@ namespace EntityFramework.Utilities
             throw new NotImplementedException();
         }
 
-        #endregion
-
+        #endregion Not implemented
     }
 }

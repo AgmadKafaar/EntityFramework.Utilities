@@ -1,20 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using EntityFramework.Utilities.QueryProviders;
 
-namespace EntityFramework.Utilities
+namespace EntityFramework.Utilities.Config
 {
     public static class Configuration
     {
-        static Configuration(){
-            Providers = new List<IQueryProvider>();
-            Providers.Add(new SqlQueryProvider());
-
+        static Configuration()
+        {
+            Providers = new List<IQueryProvider> {new SqlQueryProvider(), new MysqlQueryProvider()};
             Log = m => { };
-
             DisableDefaultFallback = true;
-        
         }
 
         /// <summary>
@@ -28,10 +24,9 @@ namespace EntityFramework.Utilities
         public static Action<string> Log { get; set; }
 
         /// <summary>
-        /// If you want an exception to be thrown if the provider doesn't support the operation set this to true. 
+        /// If you want an exception to be thrown if the provider doesn't support the operation set this to true.
         /// Otherwise it will fall back to the default EF behaviour meaning a performance penalty
         /// </summary>
         public static bool DisableDefaultFallback { get; set; }
-
     }
 }

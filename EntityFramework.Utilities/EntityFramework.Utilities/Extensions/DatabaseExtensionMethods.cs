@@ -1,7 +1,8 @@
-﻿using System.Data.Entity;
+﻿using System.Data.Common;
+using System.Data.Entity;
 using System.Data.SqlClient;
 
-namespace EntityFramework.Utilities
+namespace EntityFramework.Utilities.Extensions
 {
     public static class DatabaseExtensionMethods
     {
@@ -33,10 +34,6 @@ namespace EntityFramework.Utilities
             }
         }
 
-        public static string GetDatabaseName(System.Data.Common.DbConnection dbConnection)
-        {
-            return new SqlConnectionStringBuilder(dbConnection.ConnectionString).InitialCatalog;
-        }
-
+        public static string GetDatabaseName(DbConnection dbConnection) => new SqlConnectionStringBuilder(dbConnection.ConnectionString).InitialCatalog;
     }
 }

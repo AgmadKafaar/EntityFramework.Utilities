@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
-namespace Tests.FakeDomain.Models
+namespace Tests.Models
 {
     public class BlogPost
     {
-        public int ID { get; set; }
+        public int Id { get; set; }
         public string Title { get; set; }
         public string ShortTitle { get; set; }
         public DateTime Created { get; set; }

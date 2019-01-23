@@ -1,5 +1,5 @@
 ﻿
-namespace EntityFramework.Utilities
+namespace EntityFramework.Utilities.Mapping
 {
     public class QueryInformation
     {

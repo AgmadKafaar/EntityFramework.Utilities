@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Data.Entity;
 using System.Data.Entity.Core.Metadata.Edm;
 using System.Data.Entity.Core.Objects;
@@ -7,10 +8,11 @@ using System.Data.Entity.Infrastructure;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using EntityFramework.Utilities.Mapping;
 
-namespace EntityFramework.Utilities
+namespace EntityFramework.Utilities.EfQuery
 {
-    public static class EFQueryHelpers
+    public static class EfQueryHelpers
     {
         /// <summary>
         /// Loads a child collection in a more efficent way than the standard Include. Will run all involved queries as NoTracking
@@ -21,7 +23,7 @@ namespace EntityFramework.Utilities
         /// <param name="context"></param>
         /// <param name="collectionSelector">The navigation property. It can be filtered and sorted with the methods Where,OrderBy(Descending),ThenBy(Descending) </param>
         /// <returns></returns>
-        public static EFUQueryable<T> IncludeEFU<T, TChild>(this IQueryable<T> query, DbContext context, Expression<Func<T, IEnumerable<TChild>>> collectionSelector)
+        public static EfuQueryable<T> IncludeEfu<T, TChild>(this IQueryable<T> query, DbContext context, Expression<Func<T, IEnumerable<TChild>>> collectionSelector)
             where T : class
             where TChild : class
         {
@@ -40,27 +42,27 @@ namespace EntityFramework.Utilities
             var pkGetter = MakeGetterDelegate<T>(pkInfo);
 
             var childCollectionModifiers = new List<MethodCallExpression>();
-            var childProp = SetCollectionModifiersAndGetChildProperty<T, TChild>(collectionSelector, childCollectionModifiers);
+            var childProp = SetCollectionModifiersAndGetChildProperty(collectionSelector, childCollectionModifiers);
             var setter = MakeSetterDelegate<T>(childProp);
 
-            var e = new IncludeExecuter<T>
+            var e = new IncludeExecuter
             {
                 ElementType = typeof(TChild),
-                SingleItemLoader = (parent) =>
+                SingleItemLoader = parent =>
                 {
                     if (parent == null)
                     {
                         return;
                     }
                     var children = octx.CreateObjectSet<TChild>();
-                    var lambdaExpression = GetRootEntityToChildCollectionSelector<T, TChild>(cSpaceType);
+                    GetRootEntityToChildCollectionSelector<T, TChild>(cSpaceType);
 
-                    var q = ApplyChildCollectionModifiers<TChild>(children, childCollectionModifiers);
+                    var q = ApplyChildCollectionModifiers(children, childCollectionModifiers);
 
-                    var rootPK = pkGetter((T)parent);
+                    var rootPk = pkGetter((T)parent);
                     var param = Expression.Parameter(typeof(TChild), "x");
-                    var fk = GetFKProperty<T, TChild>(cSpaceTables);
-                    var body = Expression.Equal(Expression.Property(param, fk), Expression.Constant(rootPK));
+                    var fk = GetFkProperty<T, TChild>(cSpaceTables);
+                    var body = Expression.Equal(Expression.Property(param, fk), Expression.Constant(rootPk));
                     var where = Expression.Lambda<Func<TChild, bool>>(body, param);
 
                     q = q.AsNoTracking().Where(where);
@@ -70,11 +72,13 @@ namespace EntityFramework.Utilities
                 Loader = (rootFilters, parents) =>
                 {
                     var baseType = typeof(T).BaseType != typeof(object) ? typeof(T).BaseType : typeof(T);
-                    
-                    dynamic dynamicSet = octx.GetType()
-                                    .GetMethod("CreateObjectSet", new Type[] { })
-                                    .MakeGenericMethod(baseType)
-                                    .Invoke(octx, new Object[] { });
+
+                    var methodInfo = octx.GetType()
+                        .GetMethod("CreateObjectSet", new Type[] { });
+                    if (methodInfo == null) return;
+                    dynamic dynamicSet = methodInfo
+                        .MakeGenericMethod(baseType)
+                        .Invoke(octx, new Object[] { });
 
                     var set = dynamicSet.OfType<T>() as ObjectQuery<T>;
 
@@ -84,13 +88,14 @@ namespace EntityFramework.Utilities
                         var newSource = Expression.Constant(q);
                         var arguments = Enumerable.Repeat(newSource, 1).Concat(item.Arguments.Skip(1)).ToArray();
                         var newMethods = Expression.Call(item.Method, arguments);
-                        q = q.Provider.CreateQuery<T>(newMethods);
+                        q = q?.Provider.CreateQuery<T>(newMethods);
                     }
 
                     var lambdaExpression = GetRootEntityToChildCollectionSelector<T, TChild>(cSpaceType);
 
+                    if (q == null) return;
                     var childQ = q.SelectMany(lambdaExpression);
-                    childQ = ApplyChildCollectionModifiers<TChild>(childQ, childCollectionModifiers);
+                    childQ = ApplyChildCollectionModifiers(childQ, childCollectionModifiers);
 
                     var dict = childQ.AsNoTracking().ToLookup(fkGetter);
                     var list = parents.Cast<T>().ToList();
@@ -104,7 +109,7 @@ namespace EntityFramework.Utilities
                 }
             };
 
-            return new EFUQueryable<T>(query.AsNoTracking()).Include(e);
+            return new EfuQueryable<T>(query.AsNoTracking()).Include(e);
         }
 
         private static IQueryable<TChild> ApplyChildCollectionModifiers<TChild>(IQueryable<TChild> childQ, List<MethodCallExpression> childCollectionModifiers) where TChild : class
@@ -149,23 +154,23 @@ namespace EntityFramework.Utilities
             childCollectionModifiers.Reverse(); //We parse from right to left so reverse it
             if (!(temp is MemberExpression))
             {
-                throw new ArgumentException("Could not find a MemberExpression", "collectionSelector");
+                throw new ArgumentException("Could not find a MemberExpression", nameof(collectionSelector));
             }
 
             var childProp = (temp as MemberExpression).Member as PropertyInfo;
             return childProp;
         }
 
-        private static Func<TChild, object> GetForeignKeyGetter<T, TChild>(System.Collections.ObjectModel.ReadOnlyCollection<EntityType> cSpaceTables)
+        private static Func<TChild, object> GetForeignKeyGetter<T, TChild>(ReadOnlyCollection<EntityType> cSpaceTables)
             where T : class
             where TChild : class
         {
-            var fkInfo = GetFKProperty<T, TChild>(cSpaceTables);
+            var fkInfo = GetFkProperty<T, TChild>(cSpaceTables);
             var fkGetter = MakeGetterDelegate<TChild>(fkInfo);
             return fkGetter;
         }
 
-        private static PropertyInfo GetFKProperty<T, TChild>(System.Collections.ObjectModel.ReadOnlyCollection<EntityType> cSpaceTables)
+        private static PropertyInfo GetFkProperty<T, TChild>(ReadOnlyCollection<EntityType> cSpaceTables)
             where T : class
             where TChild : class
         {
@@ -177,16 +182,20 @@ namespace EntityFramework.Utilities
 
         private static IQueryable<TChild> SortQuery<TChild>(IQueryable<TChild> query, MethodCallExpression item, string method)
         {
-            var body = (item.Arguments[1] as LambdaExpression);
+            var body = item.Arguments[1] as LambdaExpression;
 
-            MethodCallExpression call = Expression.Call(
-                typeof(Queryable),
-                method,
-                new[] { typeof(TChild), body.Body.Type },
-                query.Expression,
-                Expression.Quote(body));
+            if (body != null)
+            {
+                MethodCallExpression call = Expression.Call(
+                    typeof(Queryable),
+                    method,
+                    new[] { typeof(TChild), body.Body.Type },
+                    query.Expression,
+                    Expression.Quote(body));
 
-            return (IOrderedQueryable<TChild>)query.Provider.CreateQuery<TChild>(call);
+                return (IOrderedQueryable<TChild>)query.Provider.CreateQuery<TChild>(call);
+            }
+            return null;
         }
 
         private static Expression<Func<T, IEnumerable<TChild>>> GetRootEntityToChildCollectionSelector<T, TChild>(EntityType cSpaceType)
@@ -211,27 +220,21 @@ namespace EntityFramework.Utilities
                 return Expression.Lambda<Action<T, object>>(body, target, value)
                     .Compile();
             }
-            else
-            {
-                return null;
-            }
+            return null;
         }
 
-        static Func<X, object> MakeGetterDelegate<X>(PropertyInfo property)
+        static Func<TX, object> MakeGetterDelegate<TX>(PropertyInfo property)
         {
             MethodInfo getMethod = property.GetGetMethod();
             if (getMethod != null)
             {
-                var target = Expression.Parameter(typeof(X));
+                var target = Expression.Parameter(typeof(TX));
                 var body = Expression.Call(target, getMethod);
                 Expression conversion = Expression.Convert(body, typeof(object));
-                return Expression.Lambda<Func<X, object>>(conversion, target)
+                return Expression.Lambda<Func<TX, object>>(conversion, target)
                     .Compile();
             }
-            else
-            {
-                return null;
-            }
+            return null;
         }
     }
 }

@@ -1,6 +1,6 @@
-﻿
-using System.Diagnostics;
-namespace EntityFramework.Utilities
+﻿using System.Diagnostics;
+
+namespace EntityFramework.Utilities.Mapping
 {
     [DebuggerDisplay("NameOnObject = {NameOnObject} NameInDatabase = {NameInDatabase}")]
     public class ColumnMapping
@@ -8,9 +8,7 @@ namespace EntityFramework.Utilities
         public string NameOnObject { get; set; }
         public string StaticValue { get; set; }
         public string NameInDatabase { get; set; }
-
         public string DataType { get; set; }
-
         public bool IsPrimaryKey { get; set; }
     }
 }
